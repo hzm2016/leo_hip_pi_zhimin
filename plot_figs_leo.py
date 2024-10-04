@@ -7,7 +7,7 @@ from math import *
 # file_path = 'RL_Controller_torch/20240929-130752.csv'  # Replace with your actual CSV file path
 # file_path = 'IMU_reading/imu_Serial_Python/imu_data.csv' 
 # file_path = 'RL_Controller_torch/imu_data.csv' 
-file_path = 'data/JHU/105737.csv'  
+file_path = 'data/imu_comparison.csv'  
 
 # Initialize lists for each column
 time = []

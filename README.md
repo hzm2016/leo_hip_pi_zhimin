@@ -12,7 +12,7 @@ To setup the raspberry Pi 4/5 to drive the LEO exoskeleton you must follow the n
 1. Install the latest version of Raspbian OS (64 bits[^1]) in you board
 2. Enable the Serial Port (Raspberry Pi Configuration -> Interfaces)
 2. Create a virtual environment and activate it
-- Install venv
+- Install venv  
 ```
 sudo apt update
 sudo apt upgrade
@@ -27,10 +27,10 @@ python -m venv path_of_the_venv/name_of_the_venv
 source path_of_the_venv/name_of_the_venv/bin/activate
 ```
 3. Install the following libraries[^2] :
-- Pyserial
-- PyTorch
-- Numpy
-4. Download any of the folders in the repos
+- Pyserial 
+- PyTorch  
+- Numpy  
+4. Download any of the folders in the repos  
 
 
 [^Note1]: This configuration is to run with Inertial Measurement Units (IMUs) feedback. Hence, the BIRO Lab Control Box is needed. 
