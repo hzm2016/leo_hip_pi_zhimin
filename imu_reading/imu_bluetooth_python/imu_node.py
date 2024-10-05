@@ -26,7 +26,8 @@ pos_freq = 1.0
 
 context = zmq.Context()    
 client_socket = context.socket(zmq.REQ)       
-server_address = "tcp://10.154.28.205:7793"   
+# server_address = "tcp://10.154.28.205:7793"   
+server_address = "tcp://192.168.12.112:7793"  
 client_socket.connect(server_address)     
 
 
@@ -91,7 +92,7 @@ class AnyDevice(gatt.Device):
         params[2] = 255     #静止归零速度(单位cm/s) 0:不归零 255:立即归零
         params[3] = 0       #动态归零速度(单位cm/s) 0:不归零
         params[4] = ((barometerFilter&3)<<1) | (isCompassOn&1);   
-        params[5] = 100      #数据主动上报的传输帧率[取值0-250HZ], 0表示0.5HZ
+        params[5] = 200      #数据主动上报的传输帧率[取值0-250HZ], 0表示0.5HZ
         params[6] = 1       #陀螺仪滤波系数[取值0-2],数值越大越平稳但实时性越差
         params[7] = 3       #加速计滤波系数[取值0-4],数值越大越平稳但实时性越差
         params[8] = 5       #磁力计滤波系数[取值0-9],数值越大越平稳但实时性越差
@@ -155,12 +156,11 @@ class AnyDevice(gatt.Device):
         global angle_x, angle_y, vel_x, vel_y  
         
         now = time.time() - start 
-        imu_dat = array('f',[0.0 for i in range(0,34)])  
 
         if buf[0] == 0x11: 
             ctl = (buf[2] << 8) | buf[1]  
-            print(" subscribe tag: 0x%04x"%ctl)  
-            print(" ms: ", ((buf[6]<<24) | (buf[5]<<16) | (buf[4]<<8) | (buf[3]<<0)))
+            # print(" subscribe tag: 0x%04x"%ctl)  
+            # print(" ms: ", ((buf[6]<<24) | (buf[5]<<16) | (buf[4]<<8) | (buf[3]<<0)))
 
             L =7 # 从第7字节开始根据 订阅标识tag来解析剩下的数据
             # if ((ctl & 0x0001) != 0):
@@ -190,35 +190,32 @@ class AnyDevice(gatt.Device):
 
             print(" ")
             if ((ctl & 0x0004) != 0):
-                tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
-                print("\tGX: %.3f"%tmpX) # x角速度GX
-                tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
-                print("\tGY: %.3f"%tmpY) # y角速度GY
+                vel_x = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+                # print("\tGX: %.3f"%tmpX) # x角速度GX
+                vel_y = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
+                # print("\tGY: %.3f"%tmpY) # y角速度GY
                 tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
-                print("\tGZ: %.3f"%tmpZ) # z角速度GZ
-
-                imu_dat[6] = float(tmpX)
-                imu_dat[7] = float(tmpY)
-                imu_dat[8] = float(tmpZ)
-                
-                vel_x = tmpX 
-                vel_y = tmpY  
+                # print("\tGZ: %.3f"%tmpZ) # z角速度GZ  
+                # imu_dat[6] = float(tmpX)
+                # imu_dat[7] = float(tmpY)
+                # imu_dat[8] = float(tmpZ)                
+                # vel_x = tmpX 
+                # vel_y = tmpY  
                 
             print(" ")
             if ((ctl & 0x0040) != 0):
-                tmpX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-                print("\tangleX: %.3f"%tmpX); # x角度
-                tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-                print("\tangleY: %.3f"%tmpY); # y角度
+                angle_x = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
+                # print("\tangleX: %.3f"%tmpX); # x角度
+                angle_y = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
+                # print("\tangleY: %.3f"%tmpY); # y角度 
                 tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-                print("\tangleZ: %.3f"%tmpZ); # z角度
+                # print("\tangleZ: %.3f"%tmpZ); # z角度 
 
-                imu_dat[19] = float(tmpX)
-                imu_dat[20] = float(tmpY)
-                imu_dat[21] = float(tmpZ)    
-                
-                angle_x = tmpX  
-                angle_y = tmpY  
+                # imu_dat[19] = float(tmpX)
+                # imu_dat[20] = float(tmpY)
+                # imu_dat[21] = float(tmpZ)    
+                # angle_x = tmpX  
+                # angle_y = tmpY  
             
             # print(" ")
             # if ((ctl & 0x0008) != 0):
@@ -343,20 +340,21 @@ class AnyDevice(gatt.Device):
         
         L_IMU_angle = angle_x    
         R_IMU_angle = angle_y      
-        
-        # L_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
-        # R_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
             
         L_IMU_vel   = vel_x    
         R_IMU_vel   = vel_y        
-        render_data = f"{L_IMU_angle:.1f}" + "," + f"{R_IMU_angle:.1f}" + "," + f"{L_IMU_vel:.1f}" + "," + f"{R_IMU_vel:.1f}"  
-        # client_socket.sendto(render_data.encode(), (server_ip, server_port))  
-        client_socket.send(render_data.encode())     
-        print("L_IMU_angle, R_IMU_angle :", L_IMU_angle, R_IMU_angle)    
         
-        response_data = client_socket.recv_string()    
-        all_list = [item.strip() for item in response_data.split(",")]    
-        print("received data: ", all_list[0])     
+        # L_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
+        # R_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
+        
+        # render_data = f"{L_IMU_angle:.1f}" + "," + f"{R_IMU_angle:.1f}" + "," + f"{L_IMU_vel:.1f}" + "," + f"{R_IMU_vel:.1f}"  
+        # # client_socket.sendto(render_data.encode(), (server_ip, server_port))  
+        # client_socket.send(render_data.encode())     
+        # print("L_IMU_angle, R_IMU_angle :", L_IMU_angle, R_IMU_angle)    
+        
+        # response_data = client_socket.recv_string()    
+        # all_list = [item.strip() for item in response_data.split(",")]    
+        # print("received data: ", all_list[0])     
         
 
 arg_parser = ArgumentParser(description="GATT Connect Demo")

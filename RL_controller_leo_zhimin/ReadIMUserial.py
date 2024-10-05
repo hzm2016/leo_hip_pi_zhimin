@@ -13,7 +13,9 @@ class READIMU(object):
         self.ComPort = ComPort   
         
         self.AngleX    = 0
-        self.AngleVelX = 0  
+        self.AngleVelX = 0    
+        self.AngleY    = 0
+        self.AngleVelY = 0  
         
         self.CmdPacket_Begin       = 0x49   # 起始码
         self.CmdPacket_End         = 0x4D     # 结束码
@@ -26,19 +28,20 @@ class READIMU(object):
         self.cmdLen = 0                                      # 长度
         
         #------------ Serial Begin -------------
+        self.Serial_IMU = serial.Serial(ComPort, 460800, timeout=0.001, parity=serial.PARITY_NONE)  
         # self.Serial_IMU = serial.Serial(ComPort, 230400, timeout=0.02, parity=serial.PARITY_NONE)
         # self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.007, parity=serial.PARITY_NONE)
-        self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.001, parity=serial.PARITY_NONE)  
-
-        print('Serial Open Success')           
+        # self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.001, parity=serial.PARITY_NONE)  
+        
         self.info_set()  
+        print('Serial Open Success')   
         
     def info_set(self):    
         params = [0] * 11        # 数组
         
         isCompassOn = 0          # 1=开启磁场融合姿态 0=关闭磁场融合姿态
         barometerFilter = 2      # 气压计的滤波等级[取值0-3]
-        Cmd_ReportTag = 0x040    # 功能订阅标识   
+        Cmd_ReportTag = 0x044    # 功能订阅标识   
         
         params[0] = 0x12
         params[1] = 5            # 静止状态加速度阀值
@@ -56,12 +59,13 @@ class READIMU(object):
         time.sleep(0.5)
 
         # 2.唤醒传感器
-        self.Cmd_PackAndTx([0x03], 1)     
-        time.sleep(0.5)   
+        for index in range(5):  
+            self.Cmd_PackAndTx([0x03], 1)     
+            time.sleep(0.1)     
 
-        # 3.开启主动上报
-        self.Cmd_PackAndTx([0x19], 1)    
-        time.sleep(0.5)      
+            # 3.开启主动上报
+            self.Cmd_PackAndTx([0x19], 1)    
+            time.sleep(0.1)      
     
     def Cmd_PackAndTx(self, pDat, DLen):    
         if DLen == 0 or DLen > 19:
@@ -147,8 +151,7 @@ class READIMU(object):
             if ((ctl & 0x0004) != 0):
                 self.AngleVelX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
                 print("\tGX: %.3f"%self.AngleVelX)    
-                tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
-                print("\tGY: %.3f"%tmpY)   
+                self.AngleVelY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2 
                 tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngleSpeed; L += 2
                 print("\tGZ: %.3f"%tmpZ)   
                 # self.AngleVelX = tmpX  
@@ -158,15 +161,22 @@ class READIMU(object):
             if ((ctl & 0x0040) != 0):
                 self.AngleX = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
                 print("\tangleX: %.3f"%self.AngleX) 
-                tmpY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-                print("\tangleY: %.3f"%tmpY)   
+                self.AngleY = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
+                # print("\tangleY: %.3f"%tmpY)   
                 tmpZ = np.short((np.short(buf[L+1])<<8) | buf[L]) * scaleAngle; L += 2
-                print("\tangleZ: %.3f"%tmpZ)   
+                # print("\tangleZ: %.3f"%tmpZ)   
                 # self.AngleX = tmpX    
                 # angle_y = tmpY   
                 # angle_z = tmpZ     
         else:
-            print("------data head not define")  
+            print("------data head not define")   
+            
+        imu_buffer = np.memmap("imu_data.dat", dtype='float32', mode='w+', shape=(4,))    
+        imu_buffer[0] = imu_read_left.AngleX 
+        imu_buffer[1] = imu_read_left.AngleY  
+        imu_buffer[2] = imu_read_left.AngleVelX 
+        imu_buffer[3] = imu_read_left.AngleVelY   
+        imu_buffer.flush()  
 
     def read(self):  
         data = self.Serial_IMU.read(1)       
@@ -189,32 +199,9 @@ class READIMU(object):
         toFloat= x_int * span / float((((1 << nbits) - 1))) + offset_value
         return toFloat    
 
-    def decode(self):   
-        #if len(self.buffer)==7 and self.buffer[0]==0x3a and self.buffer[1]==0xc4 :
-        if len(self.buffer)==11 and self.buffer[0]==0x31 and self.buffer[1]==0x32 and self.buffer[10]==0x33:
-            self.L_XIMU_int16=(self.buffer[2] << 8) | (self.buffer[3])
-            self.R_XIMU_int16=(self.buffer[4] << 8) | (self.buffer[5])
-            self.L_XVIMU_int16=(self.buffer[6] << 8) | (self.buffer[7])
-            self.R_XVIMU_int16=(self.buffer[8] << 8) | (self.buffer[9])
-
-            self.XIMUL=self.ToFloat(self.L_XIMU_int16, -180, 180, 16)  
-            self.XIMUR=self.ToFloat(self.R_XIMU_int16, -180, 180, 16)  
-            self.XVIMUL=self.ToFloat(self.L_XVIMU_int16, -800, 800, 16)
-            self.XVIMUR=self.ToFloat(self.R_XVIMU_int16, -800, 800, 16)  
-        else:
-            # input()  
-            print("----------------------------------------")
-            print("----------------------------------------")
-            print("----------------------------------------")
-            print("----------------------------------------") 
-            print("----------------------------------------")  
-            print("----------------------------------------")
-            print("----------------------------------------")
-            print("----------------------------------------")
-            print("----------------------------------------") 
-            print("----------------------------------------")
-            self.Serial_IMU.reset_input_buffer()
-            self.Serial_IMU.reset_output_buffer()    
+    def Reset_buffer(self):   
+        self.Serial_IMU.reset_input_buffer()
+        self.Serial_IMU.reset_output_buffer()    
             
 
 if __name__ == "__main__":  
@@ -225,19 +212,18 @@ if __name__ == "__main__":
     # 创建一个 ZeroMQ 上下文
     context = zmq.Context()  
     client_socket = context.socket(zmq.REQ)     
-    server_address = "tcp://10.154.28.205:7792"
+    server_address = "tcp://192.168.12.112:7794" 
     client_socket.connect(server_address)   
 
     ser_port_left = "/dev/ttyUSB0"      
     ser_baudrate = 115200          
     ser_timeout = 0.001         
-    
-    ser_port_right = "/dev/ttyUSB1"      
-    ser_baudrate = 115200          
-    ser_timeout = 0.001            
-    
-    imu_read_left = READIMU(ser_port_left)      
-    imu_read_right = READIMU(ser_port_right)     
+    imu_read_left = READIMU(ser_port_left)     
+        
+    # ser_port_right = "/dev/ttyUSB1"      
+    # ser_baudrate = 115200          
+    # ser_timeout = 0.001            
+    # imu_read_right = READIMU(ser_port_right)     
     
     L_IMU_angle = 0.0   
     L_IMU_angle_pre = 0.0   
@@ -259,67 +245,73 @@ if __name__ == "__main__":
     #     initial_right = imu_read_right.AngleX   
     #     print("++++++++++++++++++++++++++++")   
     
-    csv_filename = "../data/serial_data_reading.csv"  
-    with open(csv_filename, 'a', newline='') as csvfile:  
-        fieldnames = ['L_IMU_Ang', 'R_IMU_Ang', 'L_IMU_Vel', 'R_IMU_Vel', 'L_Cmd', 'R_Cmd', 'Peak', 'Time']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)  
+    # csv_filename = "../data/serial_data_reading.csv"  
+    # with open(csv_filename, 'a', newline='') as csvfile:  
+    #     fieldnames = ['L_IMU_Ang', 'R_IMU_Ang', 'L_IMU_Vel', 'R_IMU_Vel', 'L_Cmd', 'R_Cmd', 'Peak', 'Time']
+    #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)  
 
-        # # Write the header only if the file is empty
-        csvfile.seek(0, 2)
-        if csvfile.tell() == 0:
-            writer.writeheader()   
+    #     # # Write the header only if the file is empty
+    #     csvfile.seek(0, 2)
+    #     if csvfile.tell() == 0:
+    #         writer.writeheader()   
             
-        start = time.time()   
-        # 循环接收数据并处理   
-        while True:  
-            now = time.time() - start   
+    start = time.time()  
+     
+    count = 0 
+    while True:  
+        now = time.time() - start   
+        
+        # L_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
+        # R_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
+        
+        imu_read_left.read()    
+        # imu_read_right.read()         
+        
+        L_IMU_angle = imu_read_left.AngleX  
+        R_IMU_angle = imu_read_left.AngleY      
+        
+        # imu_buffer.flush()   
+        
+        # # L_IMU_angle = imu_read_left.AngleX - initial_left   
+        # # R_IMU_angle = imu_read_right.AngleX - initial_right     
+        # # L_IMU_vel   = (L_IMU_angle - L_IMU_angle_pre)/dt  
+        # # R_IMU_vel   = (R_IMU_angle - R_IMU_angle_pre)/dt    
+        # L_IMU_vel   = imu_read_left.AngleVelX 
+        # R_IMU_vel   = imu_read_right.AngleVelX   
             
-            L_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
-            R_IMU_angle = pos_ampl * sin(2 * np.pi * pos_freq * now)    
+        # L_IMU_vel   = smooth(old_value=L_IMU_vel_pre, value=L_IMU_vel)    
+        # R_IMU_vel   = smooth(old_value=R_IMU_vel_pre, value=R_IMU_vel)    
             
-            # imu_read_left.read()    
-            # imu_read_right.read()        
-            
-            # L_IMU_angle = imu_read_left.AngleX
-            # R_IMU_angle = imu_read_right.AngleX      
-            
-            # # L_IMU_angle = imu_read_left.AngleX - initial_left   
-            # # R_IMU_angle = imu_read_right.AngleX - initial_right     
-            # # L_IMU_vel   = (L_IMU_angle - L_IMU_angle_pre)/dt  
-            # # R_IMU_vel   = (R_IMU_angle - R_IMU_angle_pre)/dt    
-            # L_IMU_vel   = imu_read_left.AngleVelX 
-            # R_IMU_vel   = imu_read_right.AngleVelX   
+        # data = {
+        #     'L_IMU_Ang': L_IMU_angle, 
+        #     'R_IMU_Ang': R_IMU_angle,  
+        #     'L_IMU_Vel': L_IMU_vel,  
+        #     'R_IMU_Vel': R_IMU_vel,    
+        #     'L_Cmd': 0.0,    
+        #     'R_Cmd': 0.0,    
+        #     'Peak': 0.0,              
+        #     'Time': now    
+        # }
+        
+        # L_IMU_angle_pre = L_IMU_angle    
+        # R_IMU_angle_pre = R_IMU_angle    
+        # L_IMU_vel_pre = L_IMU_vel   
+        # R_IMU_vel_pre = R_IMU_vel   
+        print("now :", now)
+        print("L_IMU_angle, R_IMU_angle :", L_IMU_angle, R_IMU_angle)    
+        # if count%5==0:
+        #     render_data = f"{L_IMU_angle:.1f}" + "," + f"{R_IMU_angle:.1f}" + "," + f"{L_IMU_vel:.1f}" + "," + f"{R_IMU_vel:.1f}"  
+        #     client_socket.send(render_data.encode())     
+        #     response_data = client_socket.recv_string()    
+        #     all_list = [item.strip() for item in response_data.split(",")]    
+        #     print("received data: ", all_list[0])     
+        
+        # pos_ampl = float(all_list[0])    
+        # pos_freq = float(all_list[1])           
+        
+        if count%500 == 0: 
+            imu_read_left.Reset_buffer() 
              
-            # L_IMU_vel   = smooth(old_value=L_IMU_vel_pre, value=L_IMU_vel)    
-            # R_IMU_vel   = smooth(old_value=R_IMU_vel_pre, value=R_IMU_vel)    
-              
-            # data = {
-            #     'L_IMU_Ang': L_IMU_angle, 
-            #     'R_IMU_Ang': R_IMU_angle,  
-            #     'L_IMU_Vel': L_IMU_vel,  
-            #     'R_IMU_Vel': R_IMU_vel,    
-            #     'L_Cmd': 0.0,    
-            #     'R_Cmd': 0.0,    
-            #     'Peak': 0.0,              
-            #     'Time': now    
-            # }
-            
-            # L_IMU_angle_pre = L_IMU_angle    
-            # R_IMU_angle_pre = R_IMU_angle    
-            # L_IMU_vel_pre = L_IMU_vel   
-            # R_IMU_vel_pre = R_IMU_vel   
-            
-            render_data = f"{L_IMU_angle:.1f}" + "," + f"{R_IMU_angle:.1f}" + "," + f"{L_IMU_vel:.1f}" + "," + f"{R_IMU_vel:.1f}"  
-            # client_socket.sendto(render_data.encode(), (server_ip, server_port))  
-            client_socket.send(render_data.encode())     
-            print("L_IMU_angle, R_IMU_angle :", L_IMU_angle, R_IMU_angle)    
-            
-            response_data = client_socket.recv_string()    
-            all_list = [item.strip() for item in response_data.split(",")]    
-            print("received data: ", all_list[0])     
-            
-            pos_ampl = float(all_list[0])    
-            pos_freq = float(all_list[1])           
-                    
-            # writer.writerow(data)         
-            # csvfile.flush()         
+        # writer.writerow(data)         
+        # csvfile.flush()         
+        count += 1 
