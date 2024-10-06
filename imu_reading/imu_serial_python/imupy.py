@@ -4,11 +4,12 @@ import numpy as np
 from array import array
 import csv  
 
-ser_port = "/dev/ttyUSB0"      #此处需要替换为对应使用的串口号，windows系统写成COMx，若是linux则要根据所用系统进行调整如写成/dev/ttyUSBx或/dev/ttySx
-
+# ser_port = "/dev/ttyUSB0"      #此处需要替换为对应使用的串口号，windows系统写成COMx，若是linux则要根据所用系统进行调整如写成/dev/ttyUSBx或/dev/ttySx
 # ser_port = "/dev/serial0" 
+ser_port = "/dev/ttyUSB1"  
+
 ser_baudrate = 115200  # 串口波特率
-ser_timeout = 0.01        # 串口操作超时时间
+ser_timeout = 0.01     # 串口操作超时时间
 
 # Open the serial port
 ser = serial.Serial(ser_port, ser_baudrate, timeout=ser_timeout)    

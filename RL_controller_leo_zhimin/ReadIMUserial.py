@@ -28,13 +28,15 @@ class READIMU(object):
         self.cmdLen = 0                                      # 长度
         
         #------------ Serial Begin -------------
-        self.Serial_IMU = serial.Serial(ComPort, 460800, timeout=0.001, parity=serial.PARITY_NONE)  
-        # self.Serial_IMU = serial.Serial(ComPort, 230400, timeout=0.02, parity=serial.PARITY_NONE)
-        # self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.007, parity=serial.PARITY_NONE)
-        # self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.001, parity=serial.PARITY_NONE)  
+        self.Serial_IMU = serial.Serial(ComPort, 460800, timeout=0.001, parity=serial.PARITY_NONE)    
+        # self.Serial_IMU = serial.Serial(ComPort, 230400, timeout=0.02, parity=serial.PARITY_NONE)      
+        # self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.007, parity=serial.PARITY_NONE)    
+        # self.Serial_IMU = serial.Serial(ComPort, 115200, timeout=0.001, parity=serial.PARITY_NONE)   
         
         self.info_set()  
         print('Serial Open Success')   
+        
+        self.imu_buffer = np.memmap("imu_data.dat", dtype='float32', mode='r+', shape=(4,))    
         
     def info_set(self):    
         params = [0] * 11        # 数组
@@ -169,14 +171,12 @@ class READIMU(object):
                 # angle_y = tmpY   
                 # angle_z = tmpZ     
         else:
-            print("------data head not define")   
-            
-        imu_buffer = np.memmap("imu_data.dat", dtype='float32', mode='w+', shape=(4,))    
-        imu_buffer[0] = imu_read_left.AngleX 
-        imu_buffer[1] = imu_read_left.AngleY  
-        imu_buffer[2] = imu_read_left.AngleVelX 
-        imu_buffer[3] = imu_read_left.AngleVelY   
-        imu_buffer.flush()  
+            print("------data head not define")    
+        self.imu_buffer[0] = imu_read_left.AngleX 
+        self.imu_buffer[1] = imu_read_left.AngleY  
+        self.imu_buffer[2] = imu_read_left.AngleVelX 
+        self.imu_buffer[3] = imu_read_left.AngleVelY   
+        self.imu_buffer.flush()  
 
     def read(self):  
         data = self.Serial_IMU.read(1)       
@@ -209,13 +209,12 @@ if __name__ == "__main__":
     # server_port = 45678  
     # client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)   
     
-    # 创建一个 ZeroMQ 上下文
-    context = zmq.Context()  
-    client_socket = context.socket(zmq.REQ)     
-    server_address = "tcp://192.168.12.112:7794" 
-    client_socket.connect(server_address)   
+    # context = zmq.Context()  
+    # client_socket = context.socket(zmq.REQ)     
+    # server_address = "tcp://192.168.12.112:7794" 
+    # client_socket.connect(server_address)   
 
-    ser_port_left = "/dev/ttyUSB0"      
+    ser_port_left = "/dev/ttyUSB3"      
     ser_baudrate = 115200          
     ser_timeout = 0.001         
     imu_read_left = READIMU(ser_port_left)     
@@ -267,8 +266,8 @@ if __name__ == "__main__":
         imu_read_left.read()    
         # imu_read_right.read()         
         
-        L_IMU_angle = imu_read_left.AngleX  
-        R_IMU_angle = imu_read_left.AngleY      
+        # L_IMU_angle = imu_read_left.AngleX     
+        # R_IMU_angle = imu_read_left.AngleY      
         
         # imu_buffer.flush()   
         
@@ -309,8 +308,8 @@ if __name__ == "__main__":
         # pos_ampl = float(all_list[0])    
         # pos_freq = float(all_list[1])           
         
-        if count%500 == 0: 
-            imu_read_left.Reset_buffer() 
+        # if count%500 == 0: 
+        #     imu_read_left.Reset_buffer() 
              
         # writer.writerow(data)         
         # csvfile.flush()         
