@@ -5,6 +5,7 @@ import ReadIMU as ReadIMU
 from DNN_torch import DNN   
 from utils import *   
 import socket 
+import zmq  
 
 
 def SendCmdTorque(cmd1, cmd2):  
@@ -12,15 +13,6 @@ def SendCmdTorque(cmd1, cmd2):
     Ant.Cmd.Loop_R  = kqio.TOR_LOOP    
     Ant.Cmd.Value_L = cmd1    
     Ant.Cmd.Value_R = cmd2    
-
-
-# 定义服务器的IP地址和端口号
-server_ip = '10.154.28.205'    # 服务器的IP地址
-server_port = 23456  
-
-# 创建UDP客户端Socket
-client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  
-
 
 ctl_mode     = 1           # 1 for with IMU 0 for without IMU   
 nn_mode      = 1  
@@ -51,7 +43,10 @@ t_pr3 = 0
 
 L_Cmd = 0
 R_Cmd = 0
-pk    = 0
+pk    = 0  
+
+kp = 10  
+kd = 400    
 
 date  = time.localtime(time.time())
 dateh = date.tm_hour
@@ -99,12 +94,11 @@ start = time.time()
 while(AntConnected):  
     if UpdateState == 1:  
         UpdateSuccessSec = GetSec()  
-        CurrentSec = UpdateSuccessSec - StartSec   
-
-        now = (time.time()-start)   
-        ref_pos = pos_ampl * sin(2 * pi * 1/pos_fre * now)    
-
-        if ctl_mode == 0:  
+        # CurrentSec = UpdateSuccessSec - StartSec   
+        # ref_pos = pos_ampl * sin(2 * pi * 1/pos_fre * now)    
+        now = time.time() - start  
+        
+        if ctl_mode == 0:   
             imu.read()  
             imu.decode()    
         
@@ -127,16 +121,6 @@ while(AntConnected):
             L_IMU_vel   = -1 * L_encoder_vel  
             R_IMU_vel   = -1 * R_encoder_vel      
 
-        # if (now - t_pr3 > 3):   
-        #     t_pr3 = now  
-        #     pk = 0  
-
-        # if (now - t_pr1 > 0.001):   
-        # t_pr1 = now  
-        
-        kp = 10
-        kd = 400  
-
         dnn.generate_assistance(L_IMU_angle, R_IMU_angle, L_IMU_vel, R_IMU_vel, kp, kd)    
         
         L_Cmd     = dnn.hip_torque_L/torque_scale * kcontrol  
@@ -147,36 +131,25 @@ while(AntConnected):
 
         L_Cmd_sat = saturate(L_Cmd, max_cmd)     
         R_Cmd_sat = saturate(R_Cmd, max_cmd)     
-            
-        # if(L_Cmd>pk or R_Cmd>pk):   
-        #     if(R_Cmd>L_Cmd):  
-        #         pk=R_Cmd  
-        #     if(L_Cmd>R_Cmd):  
-        #         pk=L_Cmd   
         
         # send torque cmd  
-        SendCmdTorque(L_Cmd_sat, R_Cmd_sat)      
-        # SendCmdTorque(0.0, 0.0)     
+        # SendCmdTorque(L_Cmd_sat, R_Cmd_sat)      
+        SendCmdTorque(0.0, 0.0)     
+
+        print(f" Time: {now:^8.3f}, L_IMU: {L_IMU_angle:^8.3f} | R_IMU: {R_IMU_angle:^8.3f} | L_IMU_vel: {L_IMU_vel:^8.3f} | R_IMU_vel: {R_IMU_vel:^8.3f} | L_CMD: {L_Cmd:^8.3f} | R_CMD: {R_Cmd:^8.3f} | Peak: {pk:^8.3f} ")
         
-        # print(f" Time: {UpdateSuccessSec:^8.3f}, L_IMU: {L_IMU_angle:^8.3f} | R_IMU: {R_IMU_angle:^8.3f} | L_CMD: {L_Cmd_sat:^8.3f} | R_CMD: {R_Cmd_sat:^8.3f} | Peak: {pk:^8.3f} ")
-        
-        print(f" Time: {UpdateSuccessSec:^8.3f}, L_IMU: {L_IMU_angle:^8.3f} | R_IMU: {R_IMU_angle:^8.3f} | L_IMU_vel: {L_IMU_vel:^8.3f} | R_IMU_vel: {R_IMU_vel:^8.3f} | L_CMD: {L_Cmd:^8.3f} | R_CMD: {R_Cmd:^8.3f} | Peak: {pk:^8.3f} ")
-        
-        data = f"{L_IMU_angle:.1f}" + "," + f"{R_IMU_angle:.1f}" + "," + f"{L_Cmd_sat:.1f}" + "," + f"{R_Cmd_sat:.1f}"  
-        client_socket.sendto(data.encode(), (server_ip, server_port))  
-        
-        # Save to CSV 
-        write_csv(
-            now, 
-            L_IMU_angle, R_IMU_angle,
-            L_IMU_vel, R_IMU_vel,
-            L_encoder, R_encoder, 
-            L_encoder_vel, R_encoder_vel, 
-            L_Cmd, R_Cmd,
-            L_tau, R_tau 
-        )
+        # # Save to CSV 
+        # write_csv(
+        #     now, 
+        #     L_IMU_angle, R_IMU_angle,
+        #     L_IMU_vel, R_IMU_vel,
+        #     L_encoder, R_encoder, 
+        #     L_encoder_vel, R_encoder_vel, 
+        #     L_Cmd, R_Cmd,
+        #     L_tau, R_tau 
+        # )  
             
-    if UpdateSec - StartSec > 5:
+    if now > 5:  
         Ant.Disconnect()  
         print('Run Finish')  
         break  
