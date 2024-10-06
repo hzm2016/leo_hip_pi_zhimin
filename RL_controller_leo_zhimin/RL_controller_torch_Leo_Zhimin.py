@@ -69,6 +69,8 @@ with open(str(dateh)+str(datem)+str(dates)+".csv", "a") as log:
         "L_encoder_vel", "R_encoder_vel" 
     ))  
 
+imu_buffer = np.memmap("imu_data.dat", dtype='float32', mode='r+', shape=(4,))    
+
 print("Initializing the comunication with the Exoskeleton")
 GetSec           = kqio.GetSec  
 # Ant              = kqio.AntCH("/dev/ttyAMA0")                # This is the comport that connects the Raspberry Pi 4 to the LEO
@@ -120,7 +122,13 @@ while(AntConnected):
             R_IMU_angle = -1 * R_encoder  
             L_IMU_vel   = -1 * L_encoder_vel  
             R_IMU_vel   = -1 * R_encoder_vel      
-
+            
+        imu_buffer[0] = L_IMU_angle
+        imu_buffer[1] = R_IMU_angle 
+        imu_buffer[2] = L_IMU_vel  
+        imu_buffer[3] = R_IMU_vel   
+        imu_buffer.flush()   
+        
         dnn.generate_assistance(L_IMU_angle, R_IMU_angle, L_IMU_vel, R_IMU_vel, kp, kd)    
         
         L_Cmd     = dnn.hip_torque_L/torque_scale * kcontrol  
