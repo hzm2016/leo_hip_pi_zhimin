@@ -81,8 +81,7 @@ class DataStruct(object):
         self.GyroZ = 0
 
 
-class AntCH(object):
-    # Create a Device Object
+class AntCH(object):  
     def __init__(self, ComPort):
 
         self.__LastUs = GetUs()

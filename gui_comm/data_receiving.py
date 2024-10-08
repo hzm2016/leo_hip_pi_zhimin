@@ -1,8 +1,8 @@
-import zmq
+import zmq    
 
-context = zmq.Context()
-socket = context.socket(zmq.REP)  # REP 表示响应模式
-socket.bind("tcp://127.0.0.1:5555")
+context = zmq.Context()    
+socket = context.socket(zmq.REP)     
+socket.bind("tcp://127.0.0.1:5555")     
 count = 0 
 print("count :", count)  
 while True:

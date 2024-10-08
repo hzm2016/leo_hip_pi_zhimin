@@ -57,13 +57,11 @@ class READIMU(object):
         toUint=((x - x_min) * ((float)((1 << nbits) - 1) / span))
         return toUint
         
-
     def ToFloat(self,x_int, x_min, x_max, nbits):
         span = x_max - x_min
         offset_value = x_min
         toFloat= x_int * span / float((((1 << nbits) - 1))) + offset_value
         return toFloat
-
 
     def decode(self):
         #if len(self.buffer)==7 and self.buffer[0]==0x3a and self.buffer[1]==0xc4 :
@@ -84,7 +82,3 @@ class READIMU(object):
             
 
             #print(hex(self.buffer))
-
-
-
-
