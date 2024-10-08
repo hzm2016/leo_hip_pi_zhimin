@@ -495,7 +495,7 @@ def plot_average_torque(
 
 
 if __name__ == "__main__":    
-    # Create the parser
+    # Create the parser 
     parser = argparse.ArgumentParser(description='A simple calculator.')   
     
     parser.add_argument('index', type=int, help='The first number')  
